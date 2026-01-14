@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { Message } from '../types';
 
@@ -25,11 +26,11 @@ export const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({ mess
         <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 text-center px-8">
           <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-4 border border-slate-100 dark:border-slate-700">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
             </svg>
           </div>
-          <p className="text-lg font-bold text-slate-700 dark:text-slate-300">Ready to speak?</p>
-          <p className="text-sm">Pick a language and hit "Start Practice". Your AI tutor is waiting.</p>
+          <p className="text-lg font-bold text-slate-700 dark:text-slate-300">Ready to chat?</p>
+          <p className="text-sm">Select a friend and a language, then start speaking!</p>
         </div>
       )}
       
@@ -40,8 +41,8 @@ export const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({ mess
               ? 'bg-indigo-600 text-white rounded-tr-none' 
               : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-200 dark:border-slate-700'
           }`}>
-            <p className="text-[10px] font-bold mb-1 uppercase tracking-wider opacity-60">
-              {msg.role === 'user' ? 'You' : 'WordWise AI'}
+            <p className="text-[10px] font-black mb-1 uppercase tracking-widest opacity-60">
+              {msg.role === 'user' ? 'YOU' : 'COMPANION'}
             </p>
             <p className="leading-relaxed text-sm md:text-base">{msg.text}</p>
           </div>
@@ -51,7 +52,7 @@ export const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({ mess
       {currentInput && (
         <div className="flex justify-end">
           <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-indigo-500/80 text-white rounded-tr-none italic border border-indigo-400/30">
-            <p className="text-[10px] font-bold mb-1 uppercase tracking-wider opacity-60">Listening...</p>
+            <p className="text-[10px] font-black mb-1 uppercase tracking-widest opacity-60">HEARING...</p>
             <p className="leading-relaxed text-sm md:text-base">{currentInput}</p>
           </div>
         </div>
@@ -60,7 +61,7 @@ export const TranscriptionDisplay: React.FC<TranscriptionDisplayProps> = ({ mess
       {currentOutput && (
         <div className="flex justify-start">
           <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-slate-50 dark:bg-slate-800/60 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-200 dark:border-slate-700 animate-pulse">
-            <p className="text-[10px] font-bold mb-1 uppercase tracking-wider opacity-60">AI Speaking...</p>
+            <p className="text-[10px] font-black mb-1 uppercase tracking-widest opacity-60">SPEAKING...</p>
             <p className="leading-relaxed text-sm md:text-base">{currentOutput}</p>
           </div>
         </div>

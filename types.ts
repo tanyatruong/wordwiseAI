@@ -6,6 +6,16 @@ export interface Language {
   instruction: string;
 }
 
+export interface Persona {
+  id: string;
+  name: string;
+  role: string;
+  avatar: string;
+  description: string;
+  personality: string;
+  color: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'model';

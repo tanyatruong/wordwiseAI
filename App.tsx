@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
-import { Language, Message, ConnectionStatus } from './types';
-import { LANGUAGES, GEMINI_MODEL } from './constants';
+import { Language, Message, ConnectionStatus, Persona } from './types';
+import { LANGUAGES, GEMINI_MODEL, PERSONAS } from './constants';
 import { LanguageSelector } from './components/LanguageSelector';
+import { PersonaSelector } from './components/PersonaSelector';
 import { TranscriptionDisplay } from './components/TranscriptionDisplay';
 import { createBlob, decode, decodeAudioData } from './services/audioUtils';
 
@@ -12,37 +13,28 @@ const THEME_KEY = 'wordwise_theme';
 
 const App: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(LANGUAGES[0]);
+  const [selectedPersona, setSelectedPersona] = useState<Persona>(PERSONAS[0]);
   const [status, setStatus] = useState<ConnectionStatus>(ConnectionStatus.IDLE);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem(THEME_KEY);
     if (saved) return saved === 'dark';
-    // Default to system preference if no manual setting exists
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
   
-  // Initialize messages from localStorage
   const [messages, setMessages] = useState<Message[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse saved messages', e);
-        return [];
-      }
+      try { return JSON.parse(saved); } catch (e) { return []; }
     }
     return [];
   });
 
-  // State for UI display of current live transcription
   const [currentInputText, setCurrentInputText] = useState('');
   const [currentOutputText, setCurrentOutputText] = useState('');
   
-  // Refs for accumulating text during the live session
   const accInputRef = useRef('');
   const accOutputRef = useRef('');
   
-  // Audio & Session Refs
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
@@ -50,12 +42,10 @@ const App: React.FC = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<any>(null);
 
-  // Sync messages to localStorage
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
   }, [messages]);
 
-  // Sync theme to localStorage AND document class
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -103,7 +93,7 @@ const App: React.FC = () => {
   }, [stopAllAudio]);
 
   const clearSession = () => {
-    if (window.confirm('Are you sure you want to clear the conversation history? This cannot be undone.')) {
+    if (window.confirm('Clear conversation history?')) {
       setMessages([]);
       localStorage.removeItem(STORAGE_KEY);
     }
@@ -114,8 +104,6 @@ const App: React.FC = () => {
       setStatus(ConnectionStatus.CONNECTING);
       accInputRef.current = '';
       accOutputRef.current = '';
-      setCurrentInputText('');
-      setCurrentOutputText('');
 
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
       
@@ -127,6 +115,16 @@ const App: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
+      // Dynamic System Instruction: Combine Persona Personality + Language constraints
+      const dynamicInstruction = `
+        ${selectedPersona.personality}
+        
+        CRITICAL LANGUAGE RULE:
+        ${selectedLanguage.instruction}
+        
+        You must ONLY speak in the language specified above. If the user speaks a different language, gently guide them back to ${selectedLanguage.name} while maintaining your character as ${selectedPersona.name}.
+      `;
+
       const sessionPromise = ai.live.connect({
         model: GEMINI_MODEL,
         config: {
@@ -134,7 +132,7 @@ const App: React.FC = () => {
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } },
           },
-          systemInstruction: selectedLanguage.instruction,
+          systemInstruction: dynamicInstruction,
           inputAudioTranscription: {},
           outputAudioTranscription: {},
         },
@@ -203,6 +201,7 @@ const App: React.FC = () => {
             }
           },
           onerror: (e) => {
+            console.error('Session Error:', e);
             setStatus(ConnectionStatus.ERROR);
             handleStop();
           },
@@ -212,6 +211,7 @@ const App: React.FC = () => {
 
       sessionRef.current = await sessionPromise;
     } catch (err) {
+      console.error('Start Error:', err);
       setStatus(ConnectionStatus.ERROR);
       handleStop();
     }
@@ -223,7 +223,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 transition-colors duration-300">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-4 px-6 sticky top-0 z-20 shadow-sm transition-colors duration-300">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-4 px-6 sticky top-0 z-20 shadow-sm">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg ring-2 ring-indigo-100 dark:ring-indigo-900">
@@ -235,11 +235,7 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
-            <button 
-              onClick={toggleTheme}
-              className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
-              aria-label="Toggle theme"
-            >
+            <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400">
               {isDarkMode ? (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
@@ -250,20 +246,13 @@ const App: React.FC = () => {
                 </svg>
               )}
             </button>
-
             {messages.length > 0 && (
-              <button 
-                onClick={clearSession}
-                className="text-xs font-semibold text-slate-400 dark:text-slate-500 hover:text-red-500 transition-all px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-full hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-900/20"
-              >
-                Clear History
+              <button onClick={clearSession} className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-full">
+                RESET
               </button>
             )}
-            <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-xs font-semibold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-              <span className={`w-2 h-2 rounded-full ${
-                status === ConnectionStatus.CONNECTED ? 'bg-green-500 animate-pulse' : 
-                status === ConnectionStatus.CONNECTING ? 'bg-yellow-500' : 'bg-slate-300 dark:bg-slate-600'
-              }`} />
+            <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-bold text-slate-500 border border-slate-200 dark:border-slate-700">
+              <span className={`w-2 h-2 rounded-full ${status === ConnectionStatus.CONNECTED ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`} />
               {status}
             </div>
           </div>
@@ -272,11 +261,16 @@ const App: React.FC = () => {
 
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 md:p-8 flex flex-col items-center overflow-hidden">
         <div className="text-center mb-6 shrink-0">
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1">Your Personal Language Coach</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">Real-time voice immersion powered by Gemini</p>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1">Talk to Your AI Companion</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm italic">Choose who you want to meet today</p>
         </div>
 
         <div className="w-full shrink-0">
+          <PersonaSelector 
+            selectedPersona={selectedPersona} 
+            onSelect={setSelectedPersona} 
+            disabled={status !== ConnectionStatus.IDLE} 
+          />
           <LanguageSelector 
             selectedLanguage={selectedLanguage} 
             onSelect={setSelectedLanguage} 
@@ -285,13 +279,6 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex-1 w-full flex flex-col min-h-0 relative">
-          {messages.length > 0 && (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10">
-              <span className="bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-sm text-[10px] font-bold text-slate-400 dark:text-slate-500 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 tracking-wider uppercase">
-                Session Records
-              </span>
-            </div>
-          )}
           <TranscriptionDisplay 
             messages={messages} 
             currentInput={currentInputText} 
@@ -301,16 +288,13 @@ const App: React.FC = () => {
 
         <div className="w-full flex justify-center py-6 bg-transparent shrink-0">
           {status === ConnectionStatus.CONNECTED ? (
-            <button
-              onClick={handleStop}
-              className="group relative flex flex-col items-center gap-2"
-            >
-              <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-red-600 transition-all hover:scale-105 active:scale-95 ring-4 ring-red-100 dark:ring-red-900/40">
+            <button onClick={handleStop} className="group flex flex-col items-center gap-2">
+              <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-red-600 transition-all hover:scale-105 ring-4 ring-red-100 dark:ring-red-900/40">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-              <span className="text-xs font-bold text-red-500 tracking-tight uppercase">Hang Up</span>
+              <span className="text-[10px] font-black text-red-500 tracking-widest uppercase">End Chat</span>
             </button>
           ) : (
             <button
@@ -318,38 +302,20 @@ const App: React.FC = () => {
               disabled={status === ConnectionStatus.CONNECTING}
               className={`flex flex-col items-center gap-2 group ${status === ConnectionStatus.CONNECTING ? 'opacity-70 cursor-wait' : 'cursor-pointer'}`}
             >
-              <div className="w-20 h-20 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-indigo-700 transition-all hover:scale-105 active:scale-95 ring-4 ring-indigo-100 dark:ring-indigo-900/40">
+              <div className={`w-20 h-20 bg-${selectedPersona.color}-600 rounded-full flex items-center justify-center text-white shadow-xl hover:scale-105 transition-all ring-4 ring-${selectedPersona.color}-100 dark:ring-${selectedPersona.color}-900/40`}>
                 {status === ConnectionStatus.CONNECTING ? (
-                  <svg className="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <svg className="animate-spin h-10 w-10 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                  </svg>
+                  <span className="text-4xl">{selectedPersona.avatar}</span>
                 )}
               </div>
-              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 tracking-tight uppercase">
-                {status === ConnectionStatus.CONNECTING ? 'Connecting...' : 'Start Practice'}
+              <span className={`text-[10px] font-black text-${selectedPersona.color}-600 dark:text-${selectedPersona.color}-400 tracking-widest uppercase`}>
+                {status === ConnectionStatus.CONNECTING ? 'Initializing...' : `Talk to ${selectedPersona.name}`}
               </span>
             </button>
           )}
         </div>
-
-        {status === ConnectionStatus.ERROR && (
-          <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-xl text-red-600 dark:text-red-400 text-xs flex items-center gap-2 animate-bounce">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
-            Mic error: Grant access or check connection.
-          </div>
-        )}
       </main>
-
-      <footer className="py-4 text-center text-slate-400 dark:text-slate-600 text-[10px] px-4 uppercase tracking-widest border-t border-slate-100 dark:border-slate-900 transition-colors">
-        <p>WordWise AI • Next-gen Language Tutoring</p>
-      </footer>
     </div>
   );
 };
