@@ -1,20 +1,3 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+Demo Link: https://wordwiseai.onrender.com/
 
-# Run and deploy your AI Studio app
-
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/drive/1FMnSt1pHGw1rV21m3YEK4QabLbVbqMOX
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+<img width="1147" height="800" alt="Screenshot 2026-01-13 at 10 30 45 PM" src="https://github.com/user-attachments/assets/22e03ab8-c8d9-4073-90a6-d5b64ab62e2d" />
