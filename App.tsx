@@ -11,6 +11,13 @@ import { createBlob, decode, decodeAudioData } from './services/audioUtils';
 const STORAGE_KEY = 'wordwise_live_messages';
 const THEME_KEY = 'wordwise_theme';
 
+const BUTTON_THEMES: Record<string, { bg: string, ring: string, text: string }> = {
+  indigo: { bg: 'bg-indigo-600 hover:bg-indigo-700', ring: 'ring-indigo-100 dark:ring-indigo-900/40', text: 'text-indigo-600 dark:text-indigo-400' },
+  emerald: { bg: 'bg-emerald-600 hover:bg-emerald-700', ring: 'ring-emerald-100 dark:ring-emerald-900/40', text: 'text-emerald-600 dark:text-emerald-400' },
+  amber: { bg: 'bg-amber-600 hover:bg-amber-700', ring: 'ring-amber-100 dark:ring-amber-900/40', text: 'text-amber-600 dark:text-amber-400' },
+  rose: { bg: 'bg-rose-600 hover:bg-rose-700', ring: 'ring-rose-100 dark:ring-rose-900/40', text: 'text-rose-600 dark:text-rose-400' },
+};
+
 const App: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<Language>(LANGUAGES[0]);
   const [selectedPersona, setSelectedPersona] = useState<Persona>(PERSONAS[0]);
@@ -34,7 +41,6 @@ const App: React.FC = () => {
   
   const accInputRef = useRef('');
   const accOutputRef = useRef('');
-  
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
@@ -85,7 +91,6 @@ const App: React.FC = () => {
     }
     stopAllAudio();
     setStatus(ConnectionStatus.IDLE);
-    
     accInputRef.current = '';
     accOutputRef.current = '';
     setCurrentInputText('');
@@ -102,11 +107,7 @@ const App: React.FC = () => {
   const handleStart = async () => {
     try {
       setStatus(ConnectionStatus.CONNECTING);
-      accInputRef.current = '';
-      accOutputRef.current = '';
-
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-      
       const inputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       const outputCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       inputAudioContextRef.current = inputCtx;
@@ -115,14 +116,10 @@ const App: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      // Dynamic System Instruction: Combine Persona Personality + Language constraints
       const dynamicInstruction = `
         ${selectedPersona.personality}
-        
-        CRITICAL LANGUAGE RULE:
-        ${selectedLanguage.instruction}
-        
-        You must ONLY speak in the language specified above. If the user speaks a different language, gently guide them back to ${selectedLanguage.name} while maintaining your character as ${selectedPersona.name}.
+        CRITICAL LANGUAGE RULE: ${selectedLanguage.instruction}
+        You must ONLY speak in ${selectedLanguage.name}. If the user speaks a different language, gently guide them back to ${selectedLanguage.name} while staying in character as ${selectedPersona.name}.
       `;
 
       const sessionPromise = ai.live.connect({
@@ -169,13 +166,11 @@ const App: React.FC = () => {
             }
 
             if (message.serverContent?.inputTranscription) {
-              const text = message.serverContent.inputTranscription.text;
-              accInputRef.current += text;
+              accInputRef.current += message.serverContent.inputTranscription.text;
               setCurrentInputText(accInputRef.current);
             }
             if (message.serverContent?.outputTranscription) {
-              const text = message.serverContent.outputTranscription.text;
-              accOutputRef.current += text;
+              accOutputRef.current += message.serverContent.outputTranscription.text;
               setCurrentOutputText(accOutputRef.current);
             }
 
@@ -183,12 +178,11 @@ const App: React.FC = () => {
               const userText = accInputRef.current.trim();
               const modelText = accOutputRef.current.trim();
               if (userText || modelText) {
-                setMessages(prev => {
-                  const newMsgs = [...prev];
-                  if (userText) newMsgs.push({ id: `u-${Date.now()}-${Math.random()}`, role: 'user', text: userText, timestamp: Date.now() });
-                  if (modelText) newMsgs.push({ id: `m-${Date.now()}-${Math.random()}`, role: 'model', text: modelText, timestamp: Date.now() });
-                  return newMsgs;
-                });
+                setMessages(prev => [
+                  ...prev,
+                  ...(userText ? [{ id: `u-${Date.now()}-${Math.random()}`, role: 'user', text: userText, timestamp: Date.now() } as Message] : []),
+                  ...(modelText ? [{ id: `m-${Date.now()}-${Math.random()}`, role: 'model', text: modelText, timestamp: Date.now() } as Message] : [])
+                ]);
               }
               accInputRef.current = '';
               accOutputRef.current = '';
@@ -221,6 +215,8 @@ const App: React.FC = () => {
     return () => handleStop();
   }, [handleStop]);
 
+  const activeTheme = BUTTON_THEMES[selectedPersona.color] || BUTTON_THEMES.indigo;
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 transition-colors duration-300">
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-4 px-6 sticky top-0 z-20 shadow-sm">
@@ -236,15 +232,7 @@ const App: React.FC = () => {
           
           <div className="flex items-center gap-3">
             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400">
-              {isDarkMode ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                </svg>
-              )}
+              {isDarkMode ? <SunIcon /> : <MoonIcon />}
             </button>
             {messages.length > 0 && (
               <button onClick={clearSession} className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-full">
@@ -266,24 +254,12 @@ const App: React.FC = () => {
         </div>
 
         <div className="w-full shrink-0">
-          <PersonaSelector 
-            selectedPersona={selectedPersona} 
-            onSelect={setSelectedPersona} 
-            disabled={status !== ConnectionStatus.IDLE} 
-          />
-          <LanguageSelector 
-            selectedLanguage={selectedLanguage} 
-            onSelect={setSelectedLanguage} 
-            disabled={status !== ConnectionStatus.IDLE}
-          />
+          <PersonaSelector selectedPersona={selectedPersona} onSelect={setSelectedPersona} disabled={status !== ConnectionStatus.IDLE} />
+          <LanguageSelector selectedLanguage={selectedLanguage} onSelect={setSelectedLanguage} disabled={status !== ConnectionStatus.IDLE} />
         </div>
 
         <div className="flex-1 w-full flex flex-col min-h-0 relative">
-          <TranscriptionDisplay 
-            messages={messages} 
-            currentInput={currentInputText} 
-            currentOutput={currentOutputText} 
-          />
+          <TranscriptionDisplay messages={messages} currentInput={currentInputText} currentOutput={currentOutputText} />
         </div>
 
         <div className="w-full flex justify-center py-6 bg-transparent shrink-0">
@@ -302,14 +278,14 @@ const App: React.FC = () => {
               disabled={status === ConnectionStatus.CONNECTING}
               className={`flex flex-col items-center gap-2 group ${status === ConnectionStatus.CONNECTING ? 'opacity-70 cursor-wait' : 'cursor-pointer'}`}
             >
-              <div className={`w-20 h-20 bg-${selectedPersona.color}-600 rounded-full flex items-center justify-center text-white shadow-xl hover:scale-105 transition-all ring-4 ring-${selectedPersona.color}-100 dark:ring-${selectedPersona.color}-900/40`}>
+              <div className={`w-20 h-20 ${activeTheme.bg} rounded-full flex items-center justify-center text-white shadow-xl hover:scale-105 transition-all ring-4 ${activeTheme.ring}`}>
                 {status === ConnectionStatus.CONNECTING ? (
-                  <svg className="animate-spin h-10 w-10 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  <Spinner />
                 ) : (
-                  <span className="text-4xl">{selectedPersona.avatar}</span>
+                  <span className="text-4xl drop-shadow-md">{selectedPersona.avatar}</span>
                 )}
               </div>
-              <span className={`text-[10px] font-black text-${selectedPersona.color}-600 dark:text-${selectedPersona.color}-400 tracking-widest uppercase`}>
+              <span className={`text-[10px] font-black ${activeTheme.text} tracking-widest uppercase`}>
                 {status === ConnectionStatus.CONNECTING ? 'Initializing...' : `Talk to ${selectedPersona.name}`}
               </span>
             </button>
@@ -319,5 +295,24 @@ const App: React.FC = () => {
     </div>
   );
 };
+
+const SunIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+  </svg>
+);
+
+const MoonIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+  </svg>
+);
+
+const Spinner = () => (
+  <svg className="animate-spin h-10 w-10 text-white" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+  </svg>
+);
 
 export default App;
