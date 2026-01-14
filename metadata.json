@@ -1,0 +1,7 @@
+{
+  "name": "WordWise AI",
+  "description": "A real-time language learning application featuring a conversational AI partner powered by Gemini 2.5 Flash Native Audio for immersive speech-to-speech practice.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
