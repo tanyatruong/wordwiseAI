@@ -60,6 +60,12 @@ export const LANGUAGES: Language[] = [
     instruction: 'Speak in Mandarin Chinese (Putonghua). Help with natural intonation.' 
   },
   { 
+    code: 'vi-VN', 
+    name: 'Vietnamese', 
+    flag: '🇻🇳', 
+    instruction: 'Speak in Vietnamese. Focus on proper tones and natural conversational flow.' 
+  },
+  { 
     code: 'pt-BR', 
     name: 'Portuguese', 
     flag: '🇧🇷', 

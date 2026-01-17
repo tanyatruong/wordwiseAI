@@ -72,6 +72,21 @@ const App: React.FC = () => {
     nextStartTimeRef.current = 0;
   }, []);
 
+  const translateToVietnamese = async (text: string): Promise<string> => {
+    if (!text.trim()) return '';
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: `Translate the following text to Vietnamese. Provide ONLY the translated text, no extra commentary. Text: "${text}"`,
+      });
+      return response.text?.trim() || '';
+    } catch (err) {
+      console.error('Translation error:', err);
+      return '';
+    }
+  };
+
   const handleStop = useCallback(() => {
     if (sessionRef.current) {
       sessionRef.current.close();
@@ -177,11 +192,32 @@ const App: React.FC = () => {
             if (message.serverContent?.turnComplete) {
               const userText = accInputRef.current.trim();
               const modelText = accOutputRef.current.trim();
+              
               if (userText || modelText) {
+                const needsTranslation = selectedLanguage.code !== 'vi-VN';
+                
+                // Get translations concurrently if needed
+                const [userTrans, modelTrans] = await Promise.all([
+                  needsTranslation ? translateToVietnamese(userText) : Promise.resolve(''),
+                  needsTranslation ? translateToVietnamese(modelText) : Promise.resolve('')
+                ]);
+
                 setMessages(prev => [
                   ...prev,
-                  ...(userText ? [{ id: `u-${Date.now()}-${Math.random()}`, role: 'user', text: userText, timestamp: Date.now() } as Message] : []),
-                  ...(modelText ? [{ id: `m-${Date.now()}-${Math.random()}`, role: 'model', text: modelText, timestamp: Date.now() } as Message] : [])
+                  ...(userText ? [{ 
+                    id: `u-${Date.now()}-${Math.random()}`, 
+                    role: 'user', 
+                    text: userText, 
+                    translation: userTrans,
+                    timestamp: Date.now() 
+                  } as Message] : []),
+                  ...(modelText ? [{ 
+                    id: `m-${Date.now()}-${Math.random()}`, 
+                    role: 'model', 
+                    text: modelText, 
+                    translation: modelTrans,
+                    timestamp: Date.now() 
+                  } as Message] : [])
                 ]);
               }
               accInputRef.current = '';
@@ -218,14 +254,14 @@ const App: React.FC = () => {
   const activeTheme = BUTTON_THEMES[selectedPersona.color] || BUTTON_THEMES.indigo;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 transition-colors duration-300">
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-4 px-6 sticky top-0 z-20 shadow-sm">
+    <div className="h-screen bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 transition-colors duration-300 overflow-hidden">
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-3 px-6 shrink-0 z-20 shadow-sm">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg ring-2 ring-indigo-100 dark:ring-indigo-900">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg">
               W
             </div>
-            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400">
+            <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600 dark:from-indigo-400 dark:to-violet-400">
               WordWise AI
             </h1>
           </div>
@@ -247,49 +283,45 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 max-w-4xl w-full mx-auto p-4 md:p-8 flex flex-col items-center overflow-hidden">
-        <div className="text-center mb-6 shrink-0">
-          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-1">Talk to Your AI Companion</h2>
-          <p className="text-slate-500 dark:text-slate-400 text-sm italic">Choose who you want to meet today</p>
-        </div>
+      <main className="flex-1 max-w-4xl w-full mx-auto p-4 md:px-8 flex flex-col min-h-0">
+        <div className="shrink-0">
+          <div className="text-center mb-4">
+            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-0.5">Your AI Language Partner</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-xs italic">Immersive practice anywhere, anytime</p>
+          </div>
 
-        <div className="w-full shrink-0">
           <PersonaSelector selectedPersona={selectedPersona} onSelect={setSelectedPersona} disabled={status !== ConnectionStatus.IDLE} />
           <LanguageSelector selectedLanguage={selectedLanguage} onSelect={setSelectedLanguage} disabled={status !== ConnectionStatus.IDLE} />
         </div>
 
-        <div className="flex-1 w-full flex flex-col min-h-0 relative">
-          <TranscriptionDisplay messages={messages} currentInput={currentInputText} currentOutput={currentOutputText} />
-        </div>
-
-        <div className="w-full flex justify-center py-6 bg-transparent shrink-0">
+        <div className="shrink-0 flex justify-center pb-4 pt-2">
           {status === ConnectionStatus.CONNECTED ? (
-            <button onClick={handleStop} className="group flex flex-col items-center gap-2">
-              <div className="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-red-600 transition-all hover:scale-105 ring-4 ring-red-100 dark:ring-red-900/40">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <span className="text-[10px] font-black text-red-500 tracking-widest uppercase">End Chat</span>
+            <button onClick={handleStop} className="group flex items-center gap-3 px-6 py-2 bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition-all hover:scale-105 active:scale-95 ring-4 ring-red-100 dark:ring-red-900/40">
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              <span className="text-xs font-black tracking-widest uppercase">End Practice</span>
             </button>
           ) : (
             <button
               onClick={handleStart}
               disabled={status === ConnectionStatus.CONNECTING}
-              className={`flex flex-col items-center gap-2 group ${status === ConnectionStatus.CONNECTING ? 'opacity-70 cursor-wait' : 'cursor-pointer'}`}
+              className={`group flex items-center gap-3 px-8 py-3 ${activeTheme.bg} text-white rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 ring-4 ${activeTheme.ring} ${status === ConnectionStatus.CONNECTING ? 'opacity-70 cursor-wait' : 'cursor-pointer'}`}
             >
-              <div className={`w-20 h-20 ${activeTheme.bg} rounded-full flex items-center justify-center text-white shadow-xl hover:scale-105 transition-all ring-4 ${activeTheme.ring}`}>
-                {status === ConnectionStatus.CONNECTING ? (
-                  <Spinner />
-                ) : (
-                  <span className="text-4xl drop-shadow-md">{selectedPersona.avatar}</span>
-                )}
-              </div>
-              <span className={`text-[10px] font-black ${activeTheme.text} tracking-widest uppercase`}>
-                {status === ConnectionStatus.CONNECTING ? 'Initializing...' : `Talk to ${selectedPersona.name}`}
+              {status === ConnectionStatus.CONNECTING ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <span className="text-xl">{selectedPersona.avatar}</span>
+              )}
+              <span className="text-xs font-black tracking-widest uppercase">
+                {status === ConnectionStatus.CONNECTING ? 'Connecting...' : `Start Chatting with ${selectedPersona.name}`}
               </span>
             </button>
           )}
+        </div>
+
+        <div className="flex-1 min-h-0 flex flex-col pb-4">
+          <TranscriptionDisplay messages={messages} currentInput={currentInputText} currentOutput={currentOutputText} />
         </div>
       </main>
     </div>
@@ -305,13 +337,6 @@ const SunIcon = () => (
 const MoonIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
     <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-  </svg>
-);
-
-const Spinner = () => (
-  <svg className="animate-spin h-10 w-10 text-white" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
   </svg>
 );
 

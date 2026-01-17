@@ -20,6 +20,7 @@ export interface Message {
   id: string;
   role: 'user' | 'model';
   text: string;
+  translation?: string;
   timestamp: number;
 }
 
