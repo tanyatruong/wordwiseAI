@@ -113,9 +113,10 @@ const App: React.FC = () => {
   }, [stopAllAudio]);
 
   const clearSession = () => {
-    if (window.confirm('Clear conversation history?')) {
+    if (window.confirm('Are you sure you want to clear this conversation and start a new one?')) {
       setMessages([]);
       localStorage.removeItem(STORAGE_KEY);
+      handleStop();
     }
   };
 
@@ -267,14 +268,25 @@ const App: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
-            <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400">
+            <button 
+              onClick={toggleTheme} 
+              className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
+              title="Toggle theme"
+            >
               {isDarkMode ? <SunIcon /> : <MoonIcon />}
             </button>
+            
             {messages.length > 0 && (
-              <button onClick={clearSession} className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors px-3 py-1.5 border border-slate-200 dark:border-slate-800 rounded-full">
-                RESET
+              <button 
+                onClick={clearSession} 
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full border border-red-200 dark:border-red-900/30 transition-all active:scale-95"
+                title="Clear conversation and start over"
+              >
+                <TrashIcon />
+                <span className="hidden sm:inline">Start New</span>
               </button>
             )}
+
             <div className="flex items-center gap-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-bold text-slate-500 border border-slate-200 dark:border-slate-700">
               <span className={`w-2 h-2 rounded-full ${status === ConnectionStatus.CONNECTED ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`} />
               {status}
@@ -337,6 +349,12 @@ const SunIcon = () => (
 const MoonIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
     <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
   </svg>
 );
 
